@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Расписание занятий и звонков для групп ИИ-25, ИБ-1-25 и ИБ-2-25 ПГТУ — филиала НИУ МГСУ.">
+  <meta name="theme-color" content="#07110d">
+  <title>Расписание занятий — ПГТУ</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Расписание">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container site-header__inner">
+      <p class="site-header__org" id="org">ПГТУ — филиал НИУ МГСУ</p>
+      <h1 class="site-header__title" id="title">Расписание занятий</h1>
+      <p class="site-header__subtitle" id="period"></p>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="toolbar">
+      <nav class="tabs" aria-label="Разделы">
+        <button class="tab is-active" type="button" data-view="schedule">
+          <svg class="tab__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <rect x="3.4" y="4.9" width="17.2" height="15.3" rx="2.8" fill="none"
+              stroke="currentColor" stroke-width="1.9" />
+            <path d="M8 2.9v3.6M16 2.9v3.6" fill="none" stroke="currentColor"
+              stroke-width="1.9" stroke-linecap="round" />
+            <path d="M3.6 9.6h16.8" fill="none" stroke="currentColor"
+              stroke-width="1.9" stroke-linecap="round" />
+            <path d="M7.4 13.1h5.2M7.4 16.7h9.2" fill="none" stroke="currentColor"
+              stroke-width="1.9" stroke-linecap="round" />
+          </svg>
+          <span>Занятия</span>
+        </button>
+        <button class="tab" type="button" data-view="bells">
+          <svg class="tab__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.9" />
+            <path d="M12 7.2V12l3.1 2.1" fill="none" stroke="currentColor"
+              stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span>Звонки</span>
+        </button>
+      </nav>
+
+      <button class="install-btn" type="button" id="install-btn" hidden>
+        <svg class="install-btn__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <rect x="3.6" y="3.6" width="16.8" height="16.8" rx="5.2" fill="none"
+            stroke="currentColor" stroke-width="1.9" />
+          <path d="M12 8.4v7.2M8.4 12h7.2" fill="none" stroke="currentColor"
+            stroke-width="1.9" stroke-linecap="round" />
+        </svg>
+        <span>Добавить на главный экран</span>
+      </button>
+    </div>
+
+    <!-- Расписание занятий -->
+    <section class="view is-active" id="view-schedule" aria-labelledby="schedule-heading">
+      <h2 class="visually-hidden" id="schedule-heading">Расписание занятий</h2>
+
+      <div class="controls">
+        <div class="control">
+          <span class="control__label">Группа</span>
+          <div class="segmented" id="group-switch" role="group" aria-label="Выбор группы"></div>
+        </div>
+
+        <div class="control">
+          <span class="control__label">Неделя</span>
+          <div class="segmented" id="week-switch" role="group" aria-label="Выбор недели">
+            <button class="segmented__btn" type="button" data-week="even">Чётная</button>
+            <button class="segmented__btn" type="button" data-week="odd">Нечётная</button>
+          </div>
+          <button class="auto-toggle" type="button" id="auto-week" aria-pressed="true"
+            title="Определять неделю по текущей дате">Авто</button>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="schedule" id="schedule-table"></table>
+      </div>
+    </section>
+
+    <!-- Звонки -->
+    <section class="view" id="view-bells" aria-labelledby="bells-heading" hidden>
+      <h2 class="section-title" id="bells-heading">Расписание звонков</h2>
+
+      <div class="bells-layout">
+        <div class="table-wrap table-wrap--narrow">
+          <table class="bells" id="bells-table">
+            <thead>
+              <tr>
+                <th scope="col">Пара / перерыв</th>
+                <th scope="col">Начало</th>
+                <th scope="col">Окончание</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <aside class="clock-card" aria-label="Текущее время по GMT+3">
+          <p class="clock-card__label">Текущее время</p>
+
+          <svg class="clock" viewBox="0 0 240 240" aria-hidden="true">
+            <defs>
+              <radialGradient id="clock-face" cx="50%" cy="40%" r="68%">
+                <stop offset="0%" stop-color="#163c2c" />
+                <stop offset="100%" stop-color="#081811" />
+              </radialGradient>
+            </defs>
+
+            <circle cx="120" cy="120" r="112" fill="url(#clock-face)"
+              stroke="#8ad9ac" stroke-opacity="0.28" stroke-width="1.5" />
+            <circle cx="120" cy="120" r="103" fill="none"
+              stroke="#8ad9ac" stroke-opacity="0.07" stroke-width="1" />
+
+            <g id="clock-ticks"></g>
+
+            <g fill="#a9c4b5" font-size="13" font-weight="600" text-anchor="middle">
+              <text x="120" y="53" dominant-baseline="middle">12</text>
+              <text x="187" y="120" dominant-baseline="middle">3</text>
+              <text x="120" y="187" dominant-baseline="middle">6</text>
+              <text x="53" y="120" dominant-baseline="middle">9</text>
+            </g>
+
+            <g stroke-linecap="round">
+              <line id="clock-hour" x1="120" y1="130" x2="120" y2="73"
+                stroke="#e2f5ea" stroke-width="6" />
+              <line id="clock-minute" x1="120" y1="134" x2="120" y2="51"
+                stroke="#b9e6cc" stroke-width="4" />
+              <line id="clock-second" x1="120" y1="139" x2="120" y2="40"
+                stroke="#8ad9ac" stroke-width="1.6" />
+            </g>
+
+            <circle cx="120" cy="120" r="5.5" fill="#8ad9ac" />
+            <circle cx="120" cy="120" r="1.8" fill="#081811" />
+          </svg>
+
+          <div class="clock__digital">
+            <span class="clock__time" id="clock-time">--:--:--</span>
+            <span class="clock__zone">GMT+3</span>
+          </div>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <!-- Подсказка «Добавить на главный экран» -->
+  <div class="modal" id="install-modal" hidden>
+    <div class="modal__backdrop" data-install-close></div>
+
+    <div class="modal__card" role="dialog" aria-modal="true"
+      aria-labelledby="install-title" aria-describedby="install-lead">
+      <button class="modal__close" type="button" id="install-close" aria-label="Закрыть"
+        data-install-close>×</button>
+
+      <h2 class="modal__title" id="install-title">Добавить на главный экран</h2>
+      <p class="modal__lead" id="install-lead">
+        Сайт появится на главном экране телефона с иконкой и будет открываться сразу,
+        без адресной строки — как обычное приложение.
+      </p>
+
+      <ol class="install-steps" id="install-steps"></ol>
+
+      <div class="modal__actions">
+        <button class="btn btn--primary" type="button" id="install-native" hidden>Установить</button>
+        <button class="btn btn--ghost" type="button" data-install-close>Понятно</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
