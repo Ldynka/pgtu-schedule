@@ -5,17 +5,31 @@
   var DATA = window.SCHEDULE_DATA;
 
   var state = {
-    group: DATA.groups[0].id,
+    faculty: null,
+    course: null,
+    group: null,
     week: 'even',
     weekAuto: true,
     view: 'schedule',
   };
 
+  var STORAGE_KEY = 'pgtu.schedule.selection';
+
   var els = {
     org: document.getElementById('org'),
     title: document.getElementById('title'),
     period: document.getElementById('period'),
-    groupSwitch: document.getElementById('group-switch'),
+    groupChip: document.getElementById('group-chip'),
+    changeGroup: document.getElementById('change-group'),
+    scheduleControls: document.getElementById('schedule-controls'),
+    scheduleWrap: document.getElementById('schedule-wrap'),
+    emptyState: document.getElementById('schedule-empty'),
+    emptyChoose: document.getElementById('empty-choose'),
+    setupModal: document.getElementById('setup-modal'),
+    setupFaculties: document.getElementById('setup-faculties'),
+    setupCourses: document.getElementById('setup-courses'),
+    setupGroups: document.getElementById('setup-groups'),
+    setupApply: document.getElementById('setup-apply'),
     weekSwitch: document.getElementById('week-switch'),
     autoWeek: document.getElementById('auto-week'),
     tabs: Array.prototype.slice.call(document.querySelectorAll('.tab')),
@@ -46,6 +60,37 @@
 
   function groupById(id) {
     return DATA.groups.filter(function (g) { return g.id === id; })[0];
+  }
+
+  function facultyById(id) {
+    return DATA.faculties.filter(function (f) { return f.id === id; })[0] || null;
+  }
+
+  function courseByNumber(faculty, number) {
+    if (!faculty) return null;
+    return faculty.courses.filter(function (c) { return c.number === number; })[0] || null;
+  }
+
+  /* Ищем факультет и курс, к которым относится группа. */
+  function locateGroup(groupId) {
+    for (var i = 0; i < DATA.faculties.length; i++) {
+      var faculty = DATA.faculties[i];
+      for (var j = 0; j < faculty.courses.length; j++) {
+        if (faculty.courses[j].groups.indexOf(groupId) !== -1) {
+          return { faculty: faculty, course: faculty.courses[j] };
+        }
+      }
+    }
+    return null;
+  }
+
+  function applyGroup(groupId) {
+    var found = locateGroup(groupId);
+    if (!found) return false;
+    state.faculty = found.faculty.id;
+    state.course = found.course.number;
+    state.group = groupId;
+    return true;
   }
 
   /* Сегодняшний день недели в формате данных: mon..fri (или null). */
@@ -97,7 +142,8 @@
     var week = params.get('week');
     var view = params.get('view');
 
-    if (group && groupById(group)) state.group = group;
+    if (group) applyGroup(group);
+
     if (week === 'auto') {
       state.weekAuto = true;
     } else if (week === 'even' || week === 'odd') {
@@ -109,10 +155,38 @@
 
   function writeHash() {
     var params = new URLSearchParams();
-    params.set('group', state.group);
+    if (state.group) {
+      params.set('faculty', state.faculty);
+      params.set('course', String(state.course));
+      params.set('group', state.group);
+    }
     params.set('week', state.weekAuto ? 'auto' : state.week);
     params.set('view', state.view);
     history.replaceState(null, '', '#' + params.toString());
+  }
+
+  /* Выбор группы запоминается, чтобы при следующем заходе не выбирать заново. */
+  function readStored() {
+    try {
+      var raw = window.localStorage.getItem(STORAGE_KEY);
+      if (!raw) return false;
+      var saved = JSON.parse(raw);
+      return saved && saved.group ? applyGroup(saved.group) : false;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function saveSelection() {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        faculty: state.faculty,
+        course: state.course,
+        group: state.group,
+      }));
+    } catch (error) {
+      /* приватный режим — просто не запоминаем */
+    }
   }
 
   // ── Отрисовка ────────────────────────────────────────────────────
@@ -124,18 +198,22 @@
     document.title = DATA.meta.title + ' — ' + DATA.meta.org;
   }
 
-  function renderGroupSwitch() {
-    els.groupSwitch.innerHTML = DATA.groups.map(function (group) {
-      return '<button class="segmented__btn" type="button" data-group="' +
-        escapeHtml(group.id) + '">' + escapeHtml(group.name) + '</button>';
-    }).join('');
-  }
-
   function syncControls() {
-    Array.prototype.forEach.call(els.groupSwitch.querySelectorAll('[data-group]'), function (btn) {
-      btn.classList.toggle('is-active', btn.dataset.group === state.group);
-      btn.setAttribute('aria-pressed', String(btn.dataset.group === state.group));
-    });
+    var hasGroup = !!state.group;
+
+    if (els.scheduleControls) els.scheduleControls.hidden = !hasGroup;
+    if (els.scheduleWrap) els.scheduleWrap.hidden = !hasGroup;
+    if (els.emptyState) els.emptyState.hidden = hasGroup;
+
+    if (hasGroup) {
+      var faculty = facultyById(state.faculty);
+      var group = groupById(state.group);
+      els.groupChip.innerHTML =
+        '<span class="group-chip__name">' + escapeHtml(group ? group.name : state.group) + '</span>' +
+        '<span class="group-chip__meta">' + escapeHtml(faculty ? faculty.name : '') +
+        ' · ' + escapeHtml(state.course) + ' курс</span>';
+    }
+
     var week = effectiveWeek();
     Array.prototype.forEach.call(els.weekSwitch.querySelectorAll('[data-week]'), function (btn) {
       btn.classList.toggle('is-active', btn.dataset.week === week);
@@ -185,6 +263,11 @@
   }
 
   function renderSchedule() {
+    if (!state.group) {
+      els.scheduleTable.innerHTML = '';
+      return;
+    }
+
     var today = todayId();
 
     var head = '<thead><tr>' +
@@ -400,13 +483,137 @@
     standaloneQuery.addListener(syncInstallButton);
   }
 
+  // ── Выбор факультета, курса и группы ────────────────────────────
+
+  var draft = { faculty: null, course: null, group: null };
+
+  function optionHtml(kind, value, label, active) {
+    return '<button class="setup__option' + (active ? ' is-active' : '') + '" type="button" ' +
+      'data-' + kind + '="' + escapeHtml(value) + '" aria-pressed="' + (active ? 'true' : 'false') + '">' +
+      escapeHtml(label) + '</button>';
+  }
+
+  function markActive(container, kind, value) {
+    Array.prototype.forEach.call(container.querySelectorAll('[data-' + kind + ']'), function (btn) {
+      var on = btn.dataset[kind] === value;
+      btn.classList.toggle('is-active', on);
+      btn.setAttribute('aria-pressed', String(on));
+    });
+  }
+
+  function focusOption(container, kind, value) {
+    var btn = container.querySelector('[data-' + kind + '="' + value + '"]');
+    if (btn) btn.focus();
+  }
+
+  function renderSetup() {
+    var faculty = facultyById(draft.faculty);
+    if (!faculty) {
+      draft.course = null;
+      draft.group = null;
+    }
+
+    els.setupFaculties.innerHTML = DATA.faculties.map(function (item) {
+      return optionHtml('faculty', item.id, item.name, draft.faculty === item.id);
+    }).join('');
+
+    var courses = faculty ? faculty.courses : [];
+    els.setupCourses.innerHTML = courses.map(function (item) {
+      return optionHtml('course', String(item.number), item.number + ' курс', draft.course === item.number);
+    }).join('');
+
+    var course = faculty ? courseByNumber(faculty, draft.course) : null;
+
+    if (!course) {
+      els.setupGroups.innerHTML = '<p class="setup__hint">Сначала выберите курс.</p>';
+    } else if (!course.groups.length) {
+      els.setupGroups.innerHTML = '<p class="setup__hint">На этом курсе групп пока нет — расписание появится позже.</p>';
+    } else {
+      els.setupGroups.innerHTML = course.groups.map(function (id) {
+        var group = groupById(id);
+        return optionHtml('group', id, group ? group.name : id, draft.group === id);
+      }).join('');
+    }
+
+    els.setupApply.disabled = !draft.group;
+  }
+
+  function openSetup() {
+    draft.faculty = state.faculty || (DATA.faculties[0] && DATA.faculties[0].id) || null;
+    draft.course = state.course || null;
+    draft.group = state.group || null;
+
+    renderSetup();
+    els.setupModal.hidden = false;
+    document.body.classList.add('has-modal');
+
+    var first = els.setupFaculties.querySelector('button');
+    if (first) first.focus();
+  }
+
+  function closeSetup() {
+    if (els.setupModal.hidden) return;
+    els.setupModal.hidden = true;
+    document.body.classList.remove('has-modal');
+    (state.group ? els.changeGroup : els.emptyChoose).focus();
+  }
+
   // ── События ──────────────────────────────────────────────────────
 
-  els.groupSwitch.addEventListener('click', function (event) {
-    var btn = event.target.closest('[data-group]');
-    if (!btn) return;
-    state.group = btn.dataset.group;
+  els.changeGroup.addEventListener('click', openSetup);
+  els.emptyChoose.addEventListener('click', openSetup);
+
+  els.setupModal.addEventListener('click', function (event) {
+    if (event.target.closest('[data-setup-close]')) {
+      closeSetup();
+      return;
+    }
+
+    var facultyBtn = event.target.closest('[data-faculty]');
+    if (facultyBtn) {
+      var facultyId = facultyBtn.dataset.faculty;
+      if (draft.faculty !== facultyId) {
+        draft.course = null;
+        draft.group = null;
+      }
+      draft.faculty = facultyId;
+      renderSetup();
+      focusOption(els.setupFaculties, 'faculty', facultyId);
+      return;
+    }
+
+    var courseBtn = event.target.closest('[data-course]');
+    if (courseBtn) {
+      var number = Number(courseBtn.dataset.course);
+      var faculty = facultyById(draft.faculty);
+      var course = courseByNumber(faculty, number);
+
+      draft.course = number;
+      if (!course || course.groups.indexOf(draft.group) === -1) draft.group = null;
+
+      renderSetup();
+      focusOption(els.setupCourses, 'course', String(number));
+      return;
+    }
+
+    var groupBtn = event.target.closest('[data-group]');
+    if (groupBtn) {
+      draft.group = groupBtn.dataset.group;
+      markActive(els.setupGroups, 'group', draft.group);
+      els.setupApply.disabled = false;
+    }
+  });
+
+  els.setupApply.addEventListener('click', function () {
+    if (!draft.group) return;
+
+    state.faculty = draft.faculty;
+    state.course = draft.course;
+    state.group = draft.group;
+
+    saveSelection();
     writeHash();
+    closeSetup();
     render();
   });
 
@@ -450,7 +657,9 @@
   });
 
   document.addEventListener('keydown', function (event) {
-    if (event.key === 'Escape') closeInstall();
+    if (event.key !== 'Escape') return;
+    closeInstall();
+    closeSetup();
   });
 
   els.installNative.addEventListener('click', function () {
@@ -475,14 +684,26 @@
   // ── Старт ────────────────────────────────────────────────────────
 
   readHash();
+
+  /* Ссылка с группой важнее сохранённого выбора, иначе берём его. */
+  if (!state.group) readStored();
+
+  /* Пришли по короткой ссылке #group=… — запоминаем выбор и приводим адрес к полному виду. */
+  if (state.group) {
+    saveSelection();
+    writeHash();
+  }
+
   renderHeader();
-  renderGroupSwitch();
   renderBells();
   renderClockTicks();
   updateClock();
   setInterval(updateClock, 1000);
   render();
   syncInstallButton();
+
+  /* Первый заход без выбранной группы — сразу предлагаем выбрать. */
+  if (!state.group) openSetup();
 
   /* Офлайн-режим и установка работают только по http(s), не с file://. */
   if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
