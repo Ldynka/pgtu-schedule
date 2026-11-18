@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Расписание занятий и звонков для групп ИИ-25, ИБ-1-25 и ИБ-2-25 ПГТУ — филиала НИУ МГСУ.">
+  <meta name="description" content="Неофициальный сайт с расписанием занятий и звонков для групп 1–4 курсов УНИИТ.">
   <meta name="theme-color" content="#07110d">
   <title>Расписание занятий — ПГТУ</title>
   <link rel="stylesheet" href="css/styles.css">
@@ -64,10 +64,16 @@
     <section class="view is-active" id="view-schedule" aria-labelledby="schedule-heading">
       <h2 class="visually-hidden" id="schedule-heading">Расписание занятий</h2>
 
-      <div class="controls">
+      <div class="schedule-empty" id="schedule-empty" hidden>
+        <p class="schedule-empty__text">Выберите факультет, курс и группу — покажем только ваше расписание.</p>
+        <button class="btn btn--primary" type="button" id="empty-choose">Выбрать группу</button>
+      </div>
+
+      <div class="controls" id="schedule-controls">
         <div class="control">
           <span class="control__label">Группа</span>
-          <div class="segmented" id="group-switch" role="group" aria-label="Выбор группы"></div>
+          <span class="group-chip" id="group-chip"></span>
+          <button class="group-change" type="button" id="change-group">Сменить</button>
         </div>
 
         <div class="control">
@@ -81,9 +87,14 @@
         </div>
       </div>
 
-      <div class="table-wrap">
+      <div class="table-wrap" id="schedule-wrap">
         <table class="schedule" id="schedule-table"></table>
       </div>
+
+      <section class="ad-slot" id="ad-slot" aria-label="Рекламный блок" hidden>
+        <span class="ad-slot__label">Реклама</span>
+        <div class="ad-slot__body" id="ad-slot-body"></div>
+      </section>
     </section>
 
     <!-- Звонки -->
@@ -151,6 +162,16 @@
     </section>
   </main>
 
+  <footer class="site-footer">
+    <div class="container site-footer__inner">
+      <span>Неофициальный сайт расписания · УНИИТ</span>
+      <a href="privacy.html">Политика конфиденциальности</a>
+      <p class="site-footer__note">
+        Личный проект. Не является официальным ресурсом ПГТУ — филиала НИУ МГСУ.
+      </p>
+    </div>
+  </footer>
+
   <!-- Подсказка «Добавить на главный экран» -->
   <div class="modal" id="install-modal" hidden>
     <div class="modal__backdrop" data-install-close></div>
@@ -175,7 +196,42 @@
     </div>
   </div>
 
+  <!-- Выбор факультета, курса и группы -->
+  <div class="modal" id="setup-modal" hidden>
+    <div class="modal__backdrop" data-setup-close></div>
+
+    <div class="modal__card modal__card--wide" role="dialog" aria-modal="true"
+      aria-labelledby="setup-title" aria-describedby="setup-lead">
+      <button class="modal__close" type="button" aria-label="Закрыть" data-setup-close>×</button>
+
+      <h2 class="modal__title" id="setup-title">Выберите свою группу</h2>
+      <p class="modal__lead" id="setup-lead">
+        Покажем расписание только для неё. Выбор запомнится на этом устройстве — потом его можно сменить.
+      </p>
+
+      <div class="setup__field">
+        <span class="setup__label">Факультет</span>
+        <div class="setup__options" id="setup-faculties" role="group" aria-label="Факультет"></div>
+      </div>
+
+      <div class="setup__field">
+        <span class="setup__label">Курс</span>
+        <div class="setup__options" id="setup-courses" role="group" aria-label="Курс"></div>
+      </div>
+
+      <div class="setup__field">
+        <span class="setup__label">Группа</span>
+        <div class="setup__options" id="setup-groups" role="group" aria-label="Группа"></div>
+      </div>
+
+      <div class="modal__actions">
+        <button class="btn btn--primary" type="button" id="setup-apply" disabled>Показать расписание</button>
+      </div>
+    </div>
+  </div>
+
   <script src="js/data.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/ads.js"></script>
 </body>
 </html>

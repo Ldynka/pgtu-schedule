@@ -3,13 +3,15 @@
  * а если интернета нет — из кэша, чтобы сайт открывался офлайн.
  * При изменении файлов сайта увеличьте номер версии в CACHE.
  */
-var CACHE = 'pgtu-schedule-v1';
+var CACHE = 'pgtu-schedule-v6';
 
 var ASSETS = [
   './',
   './index.html',
+  './privacy.html',
   './css/styles.css',
   './js/app.js',
+  './js/ads.js',
   './js/data.js',
   './manifest.json',
   './icons/icon-192.png',
@@ -42,9 +44,24 @@ self.addEventListener('activate', function (event) {
   );
 });
 
+var ORIGIN = self.location.origin;
+
 self.addEventListener('fetch', function (event) {
   if (event.request.method !== 'GET') return;
-  if (!/^https?:/.test(event.request.url)) return;
+
+  var url;
+  try {
+    url = new URL(event.request.url);
+  } catch (error) {
+    return;
+  }
+
+  /*
+   * Кэшируем только свою статику. Реклама и прочие сторонние запросы
+   * идут напрямую в сеть — поэтому в офлайне их просто нет.
+   */
+  if (url.origin !== ORIGIN) return;
+  if (/\/ads\.txt$/.test(url.pathname)) return;
 
   event.respondWith(
     fetch(event.request).then(function (response) {
