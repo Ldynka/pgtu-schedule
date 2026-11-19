@@ -41,6 +41,10 @@
     clockMinute: document.getElementById('clock-minute'),
     clockSecond: document.getElementById('clock-second'),
     clockTicks: document.getElementById('clock-ticks'),
+    wheelSegments: document.getElementById('wheel-segments'),
+    wheelNeedle: document.getElementById('wheel-needle'),
+    wheelResult: document.getElementById('wheel-result'),
+    spinWheel: document.getElementById('spin-wheel'),
     installBtn: document.getElementById('install-btn'),
     installModal: document.getElementById('install-modal'),
     installSteps: document.getElementById('install-steps'),
@@ -150,7 +154,7 @@
       state.week = week;
       state.weekAuto = false;
     }
-    if (view === 'schedule' || view === 'bells') state.view = view;
+    if (view === 'schedule' || view === 'bells' || view === 'roulette') state.view = view;
   }
 
   function writeHash() {
@@ -377,6 +381,196 @@
       'rotate(' + (seconds * 6) + ' 120 120)');
 
     els.clockTime.textContent = pad2(hours) + ':' + pad2(minutes) + ':' + pad2(seconds);
+  }
+
+  // ── Рулетка ─────────────────────────────────────────────────────
+
+  var WHEEL_CX = 160;
+  var WHEEL_CY = 160;
+  var WHEEL_RADIUS = 150;
+  var WHEEL_SPIN_MS = 4300;
+
+  /*
+   * weight — вероятность в процентах. Сумма весов должна быть 100,
+   * иначе подписи на колесе разойдутся с реальными шансами.
+   */
+  var WHEEL_SEGMENTS = [
+    {
+      id: 'go',
+      weight: 50,
+      label: 'Идти на пару',
+      lines: ['Идти', 'на пару'],
+      fill: '#1b523a',
+      stroke: 'rgba(134, 223, 168, 0.55)',
+      text: '#dcffe9',
+    },
+    {
+      id: 'skip',
+      weight: 45,
+      label: 'Не идти на пару',
+      lines: ['Не идти', 'на пару'],
+      fill: '#122e21',
+      stroke: 'rgba(122, 196, 158, 0.45)',
+      text: '#d6f3e1',
+    },
+    {
+      id: 'home',
+      weight: 5,
+      label: 'Остаться дома',
+      fill: '#0f7d57',
+      stroke: 'rgba(87, 233, 168, 0.9)',
+      text: '#d9ffef',
+    },
+  ];
+
+  var wheelRotation = 0;
+  var wheelSpinning = false;
+  var wheelTimer = null;
+  var wheelOnEnd = null;
+
+  /* Снимаем обработчик и таймер прошлого спина, чтобы они не сработали повторно. */
+  function clearWheelTimers() {
+    if (wheelTimer) {
+      window.clearTimeout(wheelTimer);
+      wheelTimer = null;
+    }
+    if (wheelOnEnd) {
+      els.wheelNeedle.removeEventListener('transitionend', wheelOnEnd);
+      wheelOnEnd = null;
+    }
+  }
+
+  function wheelPoint(angle, radius) {
+    var rad = angle * Math.PI / 180;
+    return {
+      x: WHEEL_CX + Math.sin(rad) * radius,
+      y: WHEEL_CY - Math.cos(rad) * radius,
+    };
+  }
+
+  function wheelSector(start, end) {
+    var a = wheelPoint(start, WHEEL_RADIUS);
+    var b = wheelPoint(end, WHEEL_RADIUS);
+    var large = end - start > 180 ? 1 : 0;
+
+    return 'M' + WHEEL_CX + ' ' + WHEEL_CY +
+      ' L' + a.x.toFixed(2) + ' ' + a.y.toFixed(2) +
+      ' A' + WHEEL_RADIUS + ' ' + WHEEL_RADIUS + ' 0 ' + large + ' 1 ' +
+      b.x.toFixed(2) + ' ' + b.y.toFixed(2) + ' Z';
+  }
+
+  function renderWheel() {
+    var total = 0;
+    var angle = 0;
+    var markup = '';
+
+    WHEEL_SEGMENTS.forEach(function (item) { total += item.weight; });
+
+    WHEEL_SEGMENTS.forEach(function (item) {
+      var span = item.weight / total * 360;
+
+      item.start = angle;
+      item.span = span;
+      item.mid = angle + span / 2;
+
+      markup += '<path class="roulette__segment roulette__segment--' + item.id +
+        '" d="' + wheelSector(angle, angle + span) +
+        '" fill="' + item.fill + '" stroke="' + item.stroke + '" />';
+
+      /* В узкий сектор подпись не помещается — ставим звезду, остальное есть в легенде. */
+      if (span >= 40) {
+        var point = wheelPoint(item.mid, WHEEL_RADIUS * 0.55);
+        var x = point.x.toFixed(2);
+        var y = point.y.toFixed(2);
+
+        markup += '<text class="roulette__label" x="' + x + '" y="' + y +
+          '" text-anchor="middle" fill="' + item.text + '">' +
+          '<tspan x="' + x + '" dy="-12">' + item.lines[0] + '</tspan>' +
+          '<tspan x="' + x + '" dy="16">' + item.lines[1] + '</tspan>' +
+          '<tspan class="roulette__label-sub" x="' + x + '" dy="15" fill-opacity="0.72">' +
+          item.weight + '%</tspan>' +
+          '</text>';
+      } else {
+        var star = wheelPoint(item.mid, WHEEL_RADIUS * 0.62);
+
+        markup += '<path class="roulette__star" transform="translate(' +
+          star.x.toFixed(2) + ' ' + star.y.toFixed(2) + ')" ' +
+          'd="M0 -8.2L2.29 -3.16L7.8 -2.53L3.71 1.21L4.82 6.63L0 3.9' +
+          'L-4.82 6.63L-3.71 1.21L-7.8 -2.53L-2.29 -3.16Z" />';
+      }
+
+      angle += span;
+    });
+
+    els.wheelSegments.innerHTML = markup;
+  }
+
+  function pickWheelSegment() {
+    var total = 0;
+    var roll;
+    var acc = 0;
+    var i;
+
+    WHEEL_SEGMENTS.forEach(function (item) { total += item.weight; });
+    roll = Math.random() * total;
+
+    for (i = 0; i < WHEEL_SEGMENTS.length; i++) {
+      acc += WHEEL_SEGMENTS[i].weight;
+      if (roll < acc) return WHEEL_SEGMENTS[i];
+    }
+
+    return WHEEL_SEGMENTS[WHEEL_SEGMENTS.length - 1];
+  }
+
+  function spinWheel() {
+    if (wheelSpinning) return;
+
+    var picked = pickWheelSegment();
+    var turns = 5 + Math.floor(Math.random() * 2);
+    var jitterLimit = Math.max(0, picked.span / 2 - 4);
+    var jitter = (Math.random() * 2 - 1) * jitterLimit * 0.55;
+    var current = ((wheelRotation % 360) + 360) % 360;
+    var delta = ((picked.mid + jitter - current) % 360 + 360) % 360;
+
+    clearWheelTimers();
+    wheelSpinning = true;
+    wheelRotation += delta + turns * 360;
+
+    els.spinWheel.disabled = true;
+    els.spinWheel.textContent = 'Крутим…';
+    els.wheelResult.className = 'roulette__result';
+    els.wheelResult.removeAttribute('data-tone');
+    els.wheelResult.textContent = 'Колесо крутится…';
+
+    function finish() {
+      if (!wheelSpinning) return;
+
+      clearWheelTimers();
+      wheelSpinning = false;
+      els.spinWheel.disabled = false;
+      els.spinWheel.textContent = 'Крутить';
+      els.wheelNeedle.classList.remove('is-spinning');
+
+      els.wheelResult.className = 'roulette__result has-outcome';
+      els.wheelResult.dataset.tone = picked.id;
+      els.wheelResult.innerHTML =
+        '<span class="roulette__result-label">' + escapeHtml(picked.label) + '</span>' +
+        '<span class="roulette__result-note">Выпало с шансом ' + picked.weight + '%</span>';
+    }
+
+    wheelOnEnd = function (event) {
+      if (event.propertyName !== 'transform') return;
+      finish();
+    };
+    els.wheelNeedle.addEventListener('transitionend', wheelOnEnd);
+
+    els.wheelNeedle.classList.add('is-spinning');
+    /* Фиксируем стартовое положение, чтобы переход сработал. */
+    void els.wheelNeedle.getBoundingClientRect();
+    els.wheelNeedle.style.transform = 'rotate(' + wheelRotation + 'deg)';
+
+    /* Страховка, если transitionend не придёт. */
+    wheelTimer = window.setTimeout(finish, WHEEL_SPIN_MS + 300);
   }
 
   // ── Установка на главный экран ──────────────────────────────────
@@ -650,6 +844,8 @@
     render();
   });
 
+  els.spinWheel.addEventListener('click', spinWheel);
+
   els.installBtn.addEventListener('click', openInstall);
 
   els.installModal.addEventListener('click', function (event) {
@@ -697,6 +893,7 @@
   renderHeader();
   renderBells();
   renderClockTicks();
+  renderWheel();
   updateClock();
   setInterval(updateClock, 1000);
   render();

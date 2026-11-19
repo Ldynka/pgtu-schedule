@@ -47,6 +47,15 @@
           </svg>
           <span>Звонки</span>
         </button>
+        <button class="tab" type="button" data-view="roulette">
+          <svg class="tab__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.9" />
+            <path d="M12 12V3.2M12 12l7.6 4.4M12 12l-7.6 4.4" fill="none" stroke="currentColor"
+              stroke-width="1.9" stroke-linecap="round" />
+            <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+          </svg>
+          <span>Рулетка</span>
+        </button>
       </nav>
 
       <button class="install-btn" type="button" id="install-btn" hidden>
@@ -158,6 +167,70 @@
             <span class="clock__zone">GMT+3</span>
           </div>
         </aside>
+      </div>
+    </section>
+
+    <!-- Рулетка -->
+    <section class="view" id="view-roulette" aria-labelledby="roulette-heading" hidden>
+      <h2 class="section-title" id="roulette-heading">Рулетка</h2>
+
+      <div class="roulette">
+        <div class="roulette__stage">
+          <svg class="roulette__wheel" viewBox="0 0 320 320" role="img"
+            aria-label="Колесо фортуны: остаться дома — 5%, не идти на пару — 45%, идти на пару — 50%">
+            <defs>
+              <radialGradient id="wheel-hub-fill" cx="50%" cy="38%" r="72%">
+                <stop offset="0%" stop-color="#1b4534" />
+                <stop offset="100%" stop-color="#081811" />
+              </radialGradient>
+              <linearGradient id="wheel-needle-fill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#f2fff8" />
+                <stop offset="100%" stop-color="#9fdcb9" />
+              </linearGradient>
+            </defs>
+
+            <circle class="roulette__glow" cx="160" cy="160" r="153" />
+            <g id="wheel-segments"></g>
+            <circle class="roulette__rim" cx="160" cy="160" r="150" />
+            <circle class="roulette__hub" cx="160" cy="160" r="34" />
+            <g class="roulette__needle" id="wheel-needle">
+              <path d="M160 17l12 33-6 5v101h-12V55l-6-5z" />
+            </g>
+            <circle class="roulette__needle-cap" cx="160" cy="160" r="10" />
+          </svg>
+        </div>
+
+        <div class="roulette__panel">
+          <p class="roulette__lead">
+            Сомневаетесь, идти ли на пару? Просто доверьтесь колесу.
+          </p>
+
+          <button class="btn btn--primary roulette__spin" type="button" id="spin-wheel">
+            Крутить
+          </button>
+
+          <p class="roulette__result" id="wheel-result" role="status" aria-live="polite">
+            Нажмите «Крутить» — колесо решит за вас.
+          </p>
+
+          <ul class="roulette__legend">
+            <li>
+              <span class="roulette__dot" data-tone="home"></span>
+              Остаться дома
+              <strong>5%</strong>
+            </li>
+            <li>
+              <span class="roulette__dot" data-tone="skip"></span>
+              Не идти на пару
+              <strong>45%</strong>
+            </li>
+            <li>
+              <span class="roulette__dot" data-tone="go"></span>
+              Идти на пару
+              <strong>50%</strong>
+            </li>
+          </ul>
+        </div>
       </div>
     </section>
   </main>
